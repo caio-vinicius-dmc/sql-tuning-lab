@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: tuning_lab_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tuning}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tuning_local}
+      POSTGRES_DB: ${POSTGRES_DB:-tuning_lab}
+    ports:
+      - "${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - dados_postgres:/var/lib/postgresql/data
+    # Parâmetros fixos para que o benchmark seja comparável entre máquinas.
+    # track_io_timing habilita os tempos de I/O que aparecem no EXPLAIN (BUFFERS).
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - track_io_timing=on
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tuning} -d ${POSTGRES_DB:-tuning_lab}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  dados_postgres:

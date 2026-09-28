@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Ambiente
+.env
+
+# Saída gerada em tempo de execução
+relatorios/*.md
+!relatorios/.gitkeep
+planos/
+
+# Editores
+.vscode/
+.idea/

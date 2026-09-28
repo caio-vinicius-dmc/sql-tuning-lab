@@ -1,0 +1,60 @@
+# Metadados dos cenários do laboratório.
+# O código do cenário corresponde a pasta em sql/cenarios/<código>_<nome>/.
+# Para criar um cenário novo basta adicionar um bloco aqui e a pasta com os
+# arquivos .sql correspondentes -- nada no código Python precisa mudar.
+
+[[cenario]]
+codigo = "01"
+nome = "filtro_periodo"
+titulo = "Filtro por período em tabela sem índice"
+problema = "A consulta pega uma semana de pedidos dentro de dois anos de histórico. Sem índice o Postgres lê a tabela inteira e descarta mais de 99% das linhas."
+solucao = "Índice B-tree simples na coluna de data, que é o filtro mais usado do sistema."
+espera = "Seq Scan vira Index Scan (ou Bitmap Index Scan) e a leitura de buffers cai em uma ordem de grandeza."
+
+[[cenario]]
+codigo = "02"
+nome = "join_seletivo"
+titulo = "JOIN com filtro seletivo dos dois lados"
+problema = "O filtro por UF corta poucos clientes, mas sem índice o banco varre pedidos inteiro e só depois cruza. O custo fica dominado pelo lado errado da junção."
+solucao = "Índice em clientes(uf) para achar o subconjunto pequeno e índice composto pedidos(cliente_id, criado_em) para o Nested Loop resolver cada cliente direto no índice."
+espera = "Hash Join sobre Seq Scan vira Nested Loop com Index Scan no lado de pedidos."
+
+[[cenario]]
+codigo = "03"
+nome = "status_raro"
+titulo = "Valor raro em coluna de baixa cardinalidade"
+problema = "Pedidos cancelados são menos de 1% da tabela. Um índice comum em status indexaria as 300 mil linhas para atender uma consulta que precisa de poucas milhares."
+solucao = "Índice parcial com WHERE status = 'cancelado', já ordenado por data decrescente."
+espera = "Index Scan usando um índice varias vezes menor, sem etapa de ordenação."
+
+[[cenario]]
+codigo = "04"
+nome = "ordenacao_com_limite"
+titulo = "ORDER BY com LIMIT pagando ordenação completa"
+problema = "Para devolver 20 linhas o banco ordena todos os pedidos entregues em memória. O LIMIT não evita o trabalho, só descarta o resultado."
+solucao = "Índice composto (status, valor_total DESC) que já entrega as linhas na ordem pedida."
+espera = "O no de Sort / Top-N heapsort desaparece do plano."
+
+[[cenario]]
+codigo = "05"
+nome = "indice_de_expressao"
+titulo = "Função aplicada na coluna do WHERE"
+problema = "A busca usa lower(email). Mesmo que existisse um índice em email ele seria ignorado, porque o valor indexado e diferente do valor comparado."
+solucao = "Índice sobre a expressão lower(email), que é o que a consulta realmente compara."
+espera = "Seq Scan vira Index Scan usando o índice de expressão."
+
+[[cenario]]
+codigo = "06"
+nome = "index_only_scan"
+titulo = "Agregação lendo a tabela sem precisar"
+problema = "A consulta só usa produto_id e quantidade, mas o plano vai até o heap buscar cada linha para ler uma coluna que poderia estar no próprio índice."
+solucao = "Índice com INCLUDE (quantidade), cobrindo todas as colunas da consulta."
+espera = "Index Only Scan com Heap Fetches próximo de zero."
+
+[[cenario]]
+codigo = "07"
+nome = "reescrita_sargable"
+titulo = "Quando o problema não é o índice, é a consulta"
+problema = "O índice em criado_em já existe, mas WHERE date(criado_em) = ... envolve a coluna em uma função e o planejador não consegue usa-lo. Nem adianta criar índice de expressão: date() sobre timestamptz depende do fuso e não é IMMUTABLE."
+solucao = "Reescrever o filtro como intervalo semiaberto sobre a coluna crua. Nenhum objeto novo no banco."
+espera = "O mesmo índice que estava sendo ignorado passa a ser usado."

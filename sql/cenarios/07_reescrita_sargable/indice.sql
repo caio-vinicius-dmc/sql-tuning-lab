@@ -1,0 +1,1 @@
+-- Nenhum índice novo: a correção e na consulta.
